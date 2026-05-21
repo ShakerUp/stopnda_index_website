@@ -10,6 +10,8 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from dotenv import load_dotenv
+from fastapi.staticfiles import StaticFiles
+
 
 from binance_index import get_binance_live_data
 from gate_index import get_gate_live_data
@@ -18,6 +20,7 @@ load_dotenv()
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 CACHE_TTL_SECONDS = 15
 STALE_TTL_SECONDS = 60
