@@ -38,12 +38,37 @@
         font-size: 13px;
         font-weight: 700;
       }
+
+      /* Анимация пульсации для зеленого индикатора "Онлайн" */
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.5;
+          transform: scale(1.1);
+        }
+      }
+      .animate-pulse-fast {
+        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      }
     </style>
   </head>
 
   <body class="p-3 max-w-5xl mx-auto">
-    <div class="mb-3">
+    <div
+      class="mb-3 flex justify-between items-center bg-gray-950/50 border border-gray-800 rounded-lg p-2 px-3 shadow-sm"
+    >
       <div class="text-xs text-gray-400">Binance / Gate premium index average</div>
+
+      <div class="flex items-center gap-2">
+        <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-yellow-400"></span>
+        <span id="status-text" class="text-[11px] font-mono text-gray-400 uppercase tracking-wider"
+          >Подключение...</span
+        >
+      </div>
     </div>
 
     <div class="flex gap-2 mb-3">
@@ -186,6 +211,8 @@
       };
 
       let isLoading = false;
+      let lastUpdateTime = null;
+      let timerInterval = null;
 
       const exchangeConfig = {
         binance: {
@@ -198,8 +225,46 @@
         },
       };
 
+      // Функция управления индикатором онлайна
+      function updateGlobalStatus(state, text) {
+        const dot = document.getElementById('status-dot');
+        const txt = document.getElementById('status-text');
+
+        if (!dot || !txt) return;
+
+        txt.innerText = text;
+
+        // Сбрасываем старые классы цвета и анимации
+        dot.className = 'w-2.5 h-2.5 rounded-full transition-all duration-300 ';
+
+        if (state === 'loading') {
+          dot.classList.add('bg-yellow-400', 'shadow-[0_0_8px_#facc15]');
+        } else if (state === 'online') {
+          dot.classList.add('bg-green-500', 'shadow-[0_0_8px_#22c55e]', 'animate-pulse-fast');
+        } else if (state === 'error') {
+          dot.classList.add('bg-red-500', 'shadow-[0_0_10px_#ef4444]');
+        }
+      }
+
+      // Запуск локального счетчика времени со времени последнего апдейта
+      function startLiveTimer() {
+        if (timerInterval) clearInterval(timerInterval);
+
+        timerInterval = setInterval(() => {
+          if (!lastUpdateTime) return;
+          const diffSeconds = Math.round((Date.now() - lastUpdateTime) / 1000);
+
+          // Если данные не обновлялись больше 45 секунд (а таймер стоит на 30), значит что-то подвисло
+          if (diffSeconds > 45) {
+            updateGlobalStatus('error', `Зависло (${diffSeconds} сек)`);
+          } else if (!isLoading) {
+            updateGlobalStatus('online', `Онлайн | ${diffSeconds}с назад`);
+          }
+        }, 1000);
+      }
+
       function normalizeInputSymbol() {
-        return document
+        const symbol = document
           .getElementById('symbol-input')
           .value.trim()
           .toUpperCase()
@@ -208,6 +273,12 @@
           .replace('USDT', '')
           .replace('_PERP', '')
           .replace('PERP', '');
+
+        if (symbol) {
+          localStorage.setItem('selected_crypto_symbol', symbol);
+        }
+
+        return symbol;
       }
 
       function initChart() {
@@ -332,9 +403,17 @@
         if (isLoading) return;
         isLoading = true;
 
+        // Включаем желтый индикатор — идет запрос
+        updateGlobalStatus('loading', 'Обновление данных...');
+
+        let hasError = false;
+
         try {
           const symbol = normalizeInputSymbol();
-          if (!symbol) return;
+          if (!symbol) {
+            isLoading = false;
+            return;
+          }
 
           for (const exchange of Object.keys(exchangeConfig)) {
             if (!enabledExchanges[exchange]) continue;
@@ -359,6 +438,7 @@
 
               seriesByExchange[exchange].setData(points);
             } catch (e) {
+              hasError = true;
               setStatus(exchange, 'error');
 
               const requiredEl = document.getElementById(`${exchange}-required`);
@@ -371,12 +451,31 @@
           }
 
           chart.timeScale().fitContent();
+
+          // Если критических ошибок сети нет — фиксируем время успеха
+          if (!hasError) {
+            lastUpdateTime = Date.now();
+            updateGlobalStatus('online', 'Онлайн | 0с назад');
+          } else {
+            updateGlobalStatus('error', 'Ошибка биржи');
+          }
+        } catch (globalErr) {
+          updateGlobalStatus('error', 'Ошибка сети / сервера');
         } finally {
           isLoading = false;
         }
       }
 
       initChart();
+
+      const savedSymbol = localStorage.getItem('selected_crypto_symbol');
+      if (savedSymbol) {
+        document.getElementById('symbol-input').value = savedSymbol;
+      }
+
+      // Запускаем тикающий таймер секунд
+      startLiveTimer();
+
       loadAllData();
       setInterval(loadAllData, 30000);
     </script>
