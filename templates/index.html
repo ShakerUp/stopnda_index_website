@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Crypto Funding TMA</title>
+
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+
+    <style>
+      body {
+        background-color: #131722;
+        color: #d1d4dc;
+        font-family: sans-serif;
+      }
+
+      .exchange-btn {
+        border: 1px solid #374151;
+        background: #111827;
+        color: #9ca3af;
+      }
+
+      .exchange-btn.active {
+        background: #1e3a8a;
+        color: white;
+        border-color: #3b82f6;
+      }
+
+      .metric-label {
+        color: #9ca3af;
+        font-size: 11px;
+      }
+
+      .metric-value {
+        font-family: monospace;
+        font-size: 13px;
+        font-weight: 700;
+      }
+    </style>
+  </head>
+
+  <body class="p-3 max-w-5xl mx-auto">
+    <div class="mb-3">
+      <div class="text-xs text-gray-400">Binance / Gate premium index average</div>
+    </div>
+
+    <div class="flex gap-2 mb-3">
+      <input
+        type="text"
+        id="symbol-input"
+        value="BTC"
+        placeholder="BTC / ETH / PROVE"
+        class="bg-gray-800 text-white p-2 rounded text-center border border-gray-700 uppercase font-bold flex-1"
+      />
+
+      <button
+        onclick="loadAllData()"
+        class="bg-blue-600 hover:bg-blue-700 px-4 rounded font-bold text-white"
+      >
+        OK
+      </button>
+    </div>
+
+    <div class="grid grid-cols-2 gap-2 mb-3">
+      <button
+        id="btn-binance"
+        onclick="toggleExchange('binance')"
+        class="exchange-btn active rounded-lg p-2 font-bold"
+      >
+        Binance
+      </button>
+
+      <button
+        id="btn-gate"
+        onclick="toggleExchange('gate')"
+        class="exchange-btn active rounded-lg p-2 font-bold"
+      >
+        Gate.io
+      </button>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+      <div id="card-binance" class="bg-gray-950 border border-gray-800 rounded-lg p-3 shadow-xl">
+        <div class="flex justify-between items-center mb-3">
+          <div class="font-bold text-white">Binance</div>
+          <div id="binance-status" class="text-xs font-mono text-yellow-400">loading...</div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-x-3 gap-y-2">
+          <div>
+            <div class="metric-label">Текущий фандинг</div>
+            <div id="binance-current-funding" class="metric-value text-green-400">—</div>
+          </div>
+
+          <div>
+            <div class="metric-label">Ожидаемый фандинг</div>
+            <div id="binance-projected-funding" class="metric-value text-blue-400">—</div>
+          </div>
+
+          <div>
+            <div class="metric-label">Среднее откл.</div>
+            <div id="binance-current-avg" class="metric-value">—</div>
+          </div>
+
+          <div>
+            <div class="metric-label">Ожидаемое ср. откл.</div>
+            <div id="binance-projected-avg" class="metric-value">—</div>
+          </div>
+
+          <div>
+            <div class="metric-label">Лимиты</div>
+            <div id="binance-limits" class="metric-value text-gray-300">—</div>
+          </div>
+
+          <div>
+            <div class="metric-label">Точки</div>
+            <div id="binance-points" class="metric-value text-purple-400">—</div>
+          </div>
+
+          <div class="col-span-2 border-t border-gray-800 pt-2">
+            <div class="metric-label">Нужно держать для лимита</div>
+            <div id="binance-required" class="metric-value text-yellow-400 text-base">—</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="card-gate" class="bg-gray-950 border border-gray-800 rounded-lg p-3 shadow-xl">
+        <div class="flex justify-between items-center mb-3">
+          <div class="font-bold text-white">Gate.io</div>
+          <div id="gate-status" class="text-xs font-mono text-green-400">loading...</div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-x-3 gap-y-2">
+          <div>
+            <div class="metric-label">Текущий фандинг</div>
+            <div id="gate-current-funding" class="metric-value text-green-400">—</div>
+          </div>
+
+          <div>
+            <div class="metric-label">Ожидаемый фандинг</div>
+            <div id="gate-projected-funding" class="metric-value text-blue-400">—</div>
+          </div>
+
+          <div>
+            <div class="metric-label">Среднее откл.</div>
+            <div id="gate-current-avg" class="metric-value">—</div>
+          </div>
+
+          <div>
+            <div class="metric-label">Ожидаемое ср. откл.</div>
+            <div id="gate-projected-avg" class="metric-value">—</div>
+          </div>
+
+          <div>
+            <div class="metric-label">Лимиты</div>
+            <div id="gate-limits" class="metric-value text-gray-300">—</div>
+          </div>
+
+          <div>
+            <div class="metric-label">Точки</div>
+            <div id="gate-points" class="metric-value text-purple-400">—</div>
+          </div>
+
+          <div class="col-span-2 border-t border-gray-800 pt-2">
+            <div class="metric-label">Нужно держать для лимита</div>
+            <div id="gate-required" class="metric-value text-green-400 text-base">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="chart-container"
+      class="w-full h-72 bg-gray-950 rounded-lg overflow-hidden border border-gray-800 shadow-inner"
+    ></div>
+
+    <script>
+      let chart;
+      let seriesByExchange = {};
+
+      let enabledExchanges = {
+        binance: true,
+        gate: true,
+      };
+
+      const exchangeConfig = {
+        binance: {
+          name: 'Binance',
+          color: '#facc15',
+        },
+        gate: {
+          name: 'Gate.io',
+          color: '#22c55e',
+        },
+      };
+
+      function normalizeInputSymbol() {
+        return document
+          .getElementById('symbol-input')
+          .value.trim()
+          .toUpperCase()
+          .replace('/', '')
+          .replace('_USDT', '')
+          .replace('USDT', '')
+          .replace('_PERP', '')
+          .replace('PERP', '');
+      }
+
+      function initChart() {
+        const container = document.getElementById('chart-container');
+
+        chart = LightweightCharts.createChart(container, {
+          layout: {
+            background: { color: '#090d16' },
+            textColor: '#d1d4dc',
+          },
+          grid: {
+            vertLines: { color: '#161b26' },
+            horzLines: { color: '#161b26' },
+          },
+          timeScale: {
+            timeVisible: true,
+            secondsVisible: false,
+          },
+          rightPriceScale: {
+            borderVisible: false,
+          },
+        });
+
+        new ResizeObserver(() => {
+          chart.resize(container.clientWidth, container.clientHeight);
+        }).observe(container);
+      }
+
+      function createSeries(exchange) {
+        const cfg = exchangeConfig[exchange];
+
+        if (chart.addSeries && LightweightCharts.LineSeries) {
+          return chart.addSeries(LightweightCharts.LineSeries, {
+            color: cfg.color,
+            lineWidth: 2,
+            priceLineVisible: false,
+            lastValueVisible: true,
+          });
+        }
+
+        return chart.addLineSeries({
+          color: cfg.color,
+          lineWidth: 2,
+          priceLineVisible: false,
+          lastValueVisible: true,
+        });
+      }
+
+      function toggleExchange(exchange) {
+        enabledExchanges[exchange] = !enabledExchanges[exchange];
+
+        document
+          .getElementById(`btn-${exchange}`)
+          .classList.toggle('active', enabledExchanges[exchange]);
+
+        document
+          .getElementById(`card-${exchange}`)
+          .classList.toggle('opacity-40', !enabledExchanges[exchange]);
+
+        if (!enabledExchanges[exchange] && seriesByExchange[exchange]) {
+          seriesByExchange[exchange].setData([]);
+          setStatus(exchange, 'off');
+        }
+
+        loadAllData();
+      }
+
+      function formatValue(value) {
+        if (value === undefined || value === null || Number.isNaN(Number(value))) {
+          return '—';
+        }
+
+        return Number(value).toFixed(6) + '%';
+      }
+
+      function setStatus(exchange, text) {
+        const el = document.getElementById(`${exchange}-status`);
+        if (el) el.innerText = text;
+      }
+
+      function updateCard(exchange, data) {
+        document.getElementById(`${exchange}-status`).innerText =
+          `${data.symbol} | ${data.price_mode}`;
+
+        document.getElementById(`${exchange}-current-funding`).innerText = formatValue(
+          data.current_funding,
+        );
+
+        document.getElementById(`${exchange}-projected-funding`).innerText = formatValue(
+          data.projected_funding,
+        );
+
+        document.getElementById(`${exchange}-current-avg`).innerText = formatValue(
+          data.current_avg,
+        );
+
+        document.getElementById(`${exchange}-projected-avg`).innerText = formatValue(
+          data.projected_avg,
+        );
+
+        document.getElementById(`${exchange}-limits`).innerText = data.limits || '—';
+
+        document.getElementById(`${exchange}-points`).innerText = data.points_total || '—';
+
+        document.getElementById(`${exchange}-required`).innerText = data.required_deviation || '—';
+      }
+
+      async function loadExchangeData(exchange, symbol) {
+        const res = await fetch(
+          `/api/metrics?symbol=${encodeURIComponent(symbol)}&exchange=${exchange}`,
+        );
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || `${exchange} error`);
+        }
+
+        return await res.json();
+      }
+
+      async function loadAllData() {
+        const symbol = normalizeInputSymbol();
+        if (!symbol) return;
+
+        for (const exchange of Object.keys(exchangeConfig)) {
+          if (!enabledExchanges[exchange]) continue;
+
+          try {
+            setStatus(exchange, 'loading...');
+
+            const data = await loadExchangeData(exchange, symbol);
+            updateCard(exchange, data);
+
+            if (!seriesByExchange[exchange]) {
+              seriesByExchange[exchange] = createSeries(exchange);
+            }
+
+            const points = (data.chart_data || [])
+              .map((p) => ({
+                time: Number(p.time),
+                value: Number(p.value),
+              }))
+              .filter((p) => Number.isFinite(p.time) && Number.isFinite(p.value))
+              .sort((a, b) => a.time - b.time);
+
+            seriesByExchange[exchange].setData(points);
+          } catch (e) {
+            setStatus(exchange, 'error');
+
+            const requiredEl = document.getElementById(`${exchange}-required`);
+            if (requiredEl) requiredEl.innerText = e.message;
+
+            if (seriesByExchange[exchange]) {
+              seriesByExchange[exchange].setData([]);
+            }
+          }
+        }
+
+        chart.timeScale().fitContent();
+      }
+
+      initChart();
+      loadAllData();
+      setInterval(loadAllData, 10000);
+    </script>
+  </body>
+</html>

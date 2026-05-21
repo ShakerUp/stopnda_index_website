@@ -1,0 +1,76 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual env
+venv/
+.venv/
+env/
+ENV/
+
+# dotenv
+.env
+
+# Logs
+*.log
+
+# SQLite
+*.db
+*.sqlite3
+
+# VSCode
+.vscode/
+
+# PyCharm
+.idea/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Build
+build/
+dist/
+*.egg-info/
+
+# Cache
+.pytest_cache/
+.mypy_cache/
+.cache/
+
+# Node
+node_modules/
+
+# Telegram mini app
+*.tgz
+
+# Charts/screenshots
+screenshots/
+charts/
+
+# Temporary
+tmp/
+temp/
+
+# Runtime files
+*.pid
+
+# Coverage
+.coverage
+htmlcov/
+
+# FastAPI
+*.uvicorn
+
+# Uploaded files
+uploads/
+
+# Secrets
+secrets.json
+config.local.json
+
+# Docker
+docker-compose.override.yml
