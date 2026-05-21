@@ -205,6 +205,8 @@
     <script>
       let chart;
       let seriesByExchange = {};
+      let zeroLine;
+      let zeroPriceLineCreated = false;
 
       let enabledExchanges = {
         binance: true,
@@ -290,18 +292,53 @@
             background: { color: '#090d16' },
             textColor: '#d1d4dc',
           },
+
           grid: {
             vertLines: { color: '#161b26' },
             horzLines: { color: '#161b26' },
           },
+
           timeScale: {
             timeVisible: true,
             secondsVisible: false,
-          },
-          rightPriceScale: {
+
+            rightOffset: 0,
+            barSpacing: 6,
+
+            fixLeftEdge: true,
+            fixRightEdge: true,
+
             borderVisible: false,
           },
+
+          rightPriceScale: {
+            borderVisible: false,
+
+            scaleMargins: {
+              top: 0.08,
+              bottom: 0.08,
+            },
+          },
         });
+
+        const zeroLineOptions = {
+          color: 'rgba(255,255,255,0.55)',
+
+          lineWidth: 2,
+
+          lineStyle: LightweightCharts.LineStyle.Dashed,
+
+          priceLineVisible: false,
+          lastValueVisible: false,
+
+          crosshairMarkerVisible: false,
+        };
+
+        if (chart.addSeries && LightweightCharts.LineSeries) {
+          zeroLine = chart.addSeries(LightweightCharts.LineSeries, zeroLineOptions);
+        } else {
+          zeroLine = chart.addLineSeries(zeroLineOptions);
+        }
 
         new ResizeObserver(() => {
           chart.resize(container.clientWidth, container.clientHeight);
@@ -311,21 +348,39 @@
       function createSeries(exchange) {
         const cfg = exchangeConfig[exchange];
 
-        if (chart.addSeries && LightweightCharts.LineSeries) {
-          return chart.addSeries(LightweightCharts.LineSeries, {
-            color: cfg.color,
-            lineWidth: 2,
-            priceLineVisible: false,
-            lastValueVisible: true,
-          });
-        }
-
-        return chart.addLineSeries({
+        const options = {
           color: cfg.color,
           lineWidth: 2,
+
           priceLineVisible: false,
           lastValueVisible: true,
-        });
+        };
+
+        let series;
+
+        if (chart.addSeries && LightweightCharts.LineSeries) {
+          series = chart.addSeries(LightweightCharts.LineSeries, options);
+        } else {
+          series = chart.addLineSeries(options);
+        }
+
+        if (!window.zeroPriceLineCreated) {
+          series.createPriceLine({
+            price: 0,
+
+            color: 'rgba(255,255,255,0.65)',
+
+            lineWidth: 2,
+
+            lineStyle: LightweightCharts.LineStyle.Dashed,
+
+            axisLabelVisible: true,
+          });
+
+          window.zeroPriceLineCreated = true;
+        }
+
+        return series;
       }
 
       function toggleExchange(exchange) {
