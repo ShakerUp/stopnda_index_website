@@ -4,6 +4,13 @@ import requests
 GATE_BASE = "https://www.gate.com/apiw/v2/futures"
 SETTLE = "usdt"
 
+GATE_INTEREST_PERCENT = 0.01
+GATE_CLAMP_PERCENT = 0.05
+
+# Практический запас для Gate.
+# Если лимит -2%, то цель premium average будет примерно -2.20%.
+GATE_LIMIT_EXTRA_PERCENT = 0.20
+
 
 def gate_get_contract_info(contract):
     url = f"https://api.gateio.ws/api/v4/futures/{SETTLE}/contracts/{contract.upper()}"
@@ -55,6 +62,39 @@ def get_gate_funding_limits(contract_info, ticker_info):
     cap_percent = abs(float(cap)) * 100
     floor_percent = -cap_percent
     return floor_percent, cap_percent
+
+
+def calc_gate_funding_from_premium(avg_premium_percent, floor_percent, cap_percent):
+    interest_component = clamp(
+        GATE_INTEREST_PERCENT - avg_premium_percent,
+        -GATE_CLAMP_PERCENT,
+        GATE_CLAMP_PERCENT,
+    )
+
+    funding_percent = avg_premium_percent + interest_component
+    return clamp(funding_percent, floor_percent, cap_percent)
+
+
+def get_gate_target_premium_for_limit(target_funding_percent):
+    """
+    Gate formula:
+    funding = premium_avg + clamp(interest - premium_avg, -0.05%, +0.05%)
+
+    Для отрицательного лимита обычно clamp = +0.05,
+    значит premium_avg = target_funding - 0.05.
+
+    Для положительного лимита обычно clamp = -0.05,
+    значит premium_avg = target_funding + 0.05.
+
+    Плюс добавляем practical extra 0.20%.
+    """
+    if target_funding_percent < 0:
+        return target_funding_percent - GATE_CLAMP_PERCENT - GATE_LIMIT_EXTRA_PERCENT
+
+    if target_funding_percent > 0:
+        return target_funding_percent + GATE_CLAMP_PERCENT + GATE_LIMIT_EXTRA_PERCENT
+
+    return 0.0
 
 
 def get_gate_live_data(contract: str):
@@ -117,21 +157,23 @@ def get_gate_live_data(contract: str):
         total_sum = sum(values) + (expected_total_points - used_points) * last_value
         projected_avg_percent = (total_sum / expected_total_points) * 100
 
-    interest_rate_8h_percent = 0.01
-    funding_interval_hours = funding_interval / 3600
+    projected_funding_percent = calc_gate_funding_from_premium(
+        projected_avg_percent,
+        floor_percent,
+        cap_percent,
+    )
 
-    damped = clamp(interest_rate_8h_percent - projected_avg_percent, -0.05, 0.05)
-    raw_rate = (projected_avg_percent + damped) / (8 / funding_interval_hours)
-    projected_funding_percent = clamp(raw_rate, floor_percent, cap_percent)
-
-    # Минимально нужное среднее отклонение на остаток цикла
     points_left = expected_total_points - used_points
 
-    # Цель — нижний лимит funding, например -2.000000%
-    target_avg_percent = floor_percent
+    if projected_avg_percent < 0:
+        target_funding_percent = floor_percent
+    else:
+        target_funding_percent = cap_percent
+
+    target_avg_percent = get_gate_target_premium_for_limit(target_funding_percent)
 
     if points_left > 0:
-        current_sum_percent = current_avg_percent * used_points
+        current_sum_percent = sum(values) * 100
 
         required_deviation_percent = (
             target_avg_percent * expected_total_points - current_sum_percent
