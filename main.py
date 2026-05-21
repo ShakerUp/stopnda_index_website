@@ -70,7 +70,7 @@ async def get_cached_metrics(symbol: str, exchange: str):
     # Safe lock получение/создание (защита от Race Condition)
     async with locks_master_lock:
         if key not in locks:
-            locks[key] = asyncio.lock()
+            locks[key] = asyncio.Lock()
     
     # 2. Входим в индивидуальный лок монеты
     async with locks[key]:
