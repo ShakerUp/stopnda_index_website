@@ -24,6 +24,9 @@ STALE_TTL_SECONDS = 60
 MAX_CONCURRENT_EXTERNAL_REQUESTS = 3
 
 cache: Dict[Tuple[str, str], Dict[str, Any]] = {}
+
+# Глобальный лок для безопасного создания индивидуальных локов
+locks_master_lock = asyncio.Lock()
 locks: Dict[Tuple[str, str], asyncio.Lock] = {}
 
 external_semaphore = asyncio.Semaphore(MAX_CONCURRENT_EXTERNAL_REQUESTS)
@@ -47,43 +50,45 @@ def normalize_symbol(symbol: str, exchange: str) -> str:
 async def fetch_exchange_data(symbol: str, exchange: str):
     async with external_semaphore:
         if exchange == "gate":
+            # Выполняем синхронный запрос в отдельном потоке, чтобы не вешать сервер
             return await asyncio.to_thread(get_gate_live_data, symbol)
-
-        return await asyncio.to_thread(
-            get_binance_live_data,
-            symbol,
-            "close",
-        )
+        
+        return await asyncio.to_thread(get_binance_live_data, symbol, "close")
 
 
 async def get_cached_metrics(symbol: str, exchange: str):
     now = time.time()
     key = (exchange, symbol)
 
+    # 1. Быстрая проверка "свежего" кэша БЕЗ блокировок
     cached = cache.get(key)
-
     if cached and now - cached["ts"] <= CACHE_TTL_SECONDS:
         data = dict(cached["data"])
         data["_cache"] = "fresh"
         return data
 
-    if key not in locks:
-        locks[key] = asyncio.Lock()
-
+    # Safe lock получение/создание (защита от Race Condition)
+    async with locks_master_lock:
+        if key not in locks:
+            locks[key] = asyncio.lock()
+    
+    # 2. Входим в индивидуальный лок монеты
     async with locks[key]:
         now = time.time()
         cached = cache.get(key)
 
+        # Проверяем, возможно пока мы стояли в очереди, предыдущий запрос уже обновил кэш
         if cached and now - cached["ts"] <= CACHE_TTL_SECONDS:
             data = dict(cached["data"])
             data["_cache"] = "fresh_after_lock"
             return data
 
         try:
+            # Идем в сеть за данными
             data = await fetch_exchange_data(symbol, exchange)
 
-            if "error" in data:
-                raise Exception(data["error"])
+            if not data or "error" in data:
+                raise Exception(data.get("error", "Unknown error from exchange script"))
 
             cache[key] = {
                 "ts": time.time(),
@@ -95,18 +100,19 @@ async def get_cached_metrics(symbol: str, exchange: str):
             return data
 
         except Exception as e:
+            # Если биржа лежит или выдала ошибку — отдаем старый кэш (Stale-while-revalidate)
             if cached and now - cached["ts"] <= STALE_TTL_SECONDS:
                 data = dict(cached["data"])
                 data["_cache"] = "stale"
                 data["_warning"] = str(e)
                 return data
-
             raise
 
 
 @app.get("/", response_class=HTMLResponse)
 async def route_index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    # ИСПРАВЛЕНО: Новый синтаксис, который не вызывает ошибку 500
+    return templates.TemplateResponse(request=request, name="index.html")
 
 
 @app.get("/api/check-auth")
@@ -129,6 +135,5 @@ async def api_metrics(symbol: str, exchange: str = "binance"):
 
     except HTTPException:
         raise
-
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
