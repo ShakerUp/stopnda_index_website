@@ -185,6 +185,8 @@
         gate: true,
       };
 
+      let isLoading = false;
+
       const exchangeConfig = {
         binance: {
           name: 'Binance',
@@ -327,49 +329,56 @@
       }
 
       async function loadAllData() {
-        const symbol = normalizeInputSymbol();
-        if (!symbol) return;
+        if (isLoading) return;
+        isLoading = true;
 
-        for (const exchange of Object.keys(exchangeConfig)) {
-          if (!enabledExchanges[exchange]) continue;
+        try {
+          const symbol = normalizeInputSymbol();
+          if (!symbol) return;
 
-          try {
-            setStatus(exchange, 'loading...');
+          for (const exchange of Object.keys(exchangeConfig)) {
+            if (!enabledExchanges[exchange]) continue;
 
-            const data = await loadExchangeData(exchange, symbol);
-            updateCard(exchange, data);
+            try {
+              setStatus(exchange, 'loading...');
 
-            if (!seriesByExchange[exchange]) {
-              seriesByExchange[exchange] = createSeries(exchange);
-            }
+              const data = await loadExchangeData(exchange, symbol);
+              updateCard(exchange, data);
 
-            const points = (data.chart_data || [])
-              .map((p) => ({
-                time: Number(p.time),
-                value: Number(p.value),
-              }))
-              .filter((p) => Number.isFinite(p.time) && Number.isFinite(p.value))
-              .sort((a, b) => a.time - b.time);
+              if (!seriesByExchange[exchange]) {
+                seriesByExchange[exchange] = createSeries(exchange);
+              }
 
-            seriesByExchange[exchange].setData(points);
-          } catch (e) {
-            setStatus(exchange, 'error');
+              const points = (data.chart_data || [])
+                .map((p) => ({
+                  time: Number(p.time),
+                  value: Number(p.value),
+                }))
+                .filter((p) => Number.isFinite(p.time) && Number.isFinite(p.value))
+                .sort((a, b) => a.time - b.time);
 
-            const requiredEl = document.getElementById(`${exchange}-required`);
-            if (requiredEl) requiredEl.innerText = e.message;
+              seriesByExchange[exchange].setData(points);
+            } catch (e) {
+              setStatus(exchange, 'error');
 
-            if (seriesByExchange[exchange]) {
-              seriesByExchange[exchange].setData([]);
+              const requiredEl = document.getElementById(`${exchange}-required`);
+              if (requiredEl) requiredEl.innerText = e.message;
+
+              if (seriesByExchange[exchange]) {
+                seriesByExchange[exchange].setData([]);
+              }
             }
           }
-        }
 
-        chart.timeScale().fitContent();
+          chart.timeScale().fitContent();
+        } finally {
+          isLoading = false;
+        }
       }
 
       initChart();
       loadAllData();
-      setInterval(loadAllData, 10000);
+      setInterval(loadAllData, 30000);
     </script>
   </body>
 </html>
