@@ -9,7 +9,7 @@ GATE_CLAMP_PERCENT = 0.05
 
 # Практический запас для Gate.
 # Если лимит -2%, то цель premium average будет примерно -2.20%.
-GATE_LIMIT_EXTRA_PERCENT = 0.20
+GATE_LIMIT_EXTRA_PERCENT = 0.15
 
 
 def gate_get_contract_info(contract):
