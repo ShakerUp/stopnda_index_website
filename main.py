@@ -15,6 +15,8 @@ from fastapi.staticfiles import StaticFiles
 
 from binance_index import get_binance_live_data
 from gate_index import get_gate_live_data
+from bitget_index import get_bitget_live_data
+from bybit_index import get_bybit_live_data
 
 load_dotenv()
 
@@ -53,9 +55,12 @@ def normalize_symbol(symbol: str, exchange: str) -> str:
 async def fetch_exchange_data(symbol: str, exchange: str):
     async with external_semaphore:
         if exchange == "gate":
-            # Выполняем синхронный запрос в отдельном потоке, чтобы не вешать сервер
             return await asyncio.to_thread(get_gate_live_data, symbol)
-        
+        elif exchange == "bitget":
+            return await get_bitget_live_data(symbol)
+        elif exchange == "bybit":
+            return await get_bybit_live_data(symbol)  # Прямой вызов асинхронной функции
+
         return await asyncio.to_thread(get_binance_live_data, symbol, "close")
 
 
@@ -128,7 +133,7 @@ async def api_metrics(symbol: str, exchange: str = "binance"):
     try:
         exchange = exchange.lower().strip()
 
-        if exchange not in {"binance", "gate"}:
+        if exchange not in {"binance", "gate", "bitget", "bybit"}:
             raise HTTPException(status_code=400, detail="Unknown exchange")
 
         symbol_clean = normalize_symbol(symbol, exchange)

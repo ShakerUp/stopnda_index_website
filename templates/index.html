@@ -17,18 +17,6 @@
         font-family: sans-serif;
       }
 
-      .exchange-btn {
-        border: 1px solid #374151;
-        background: #111827;
-        color: #9ca3af;
-      }
-
-      .exchange-btn.active {
-        background: #1e3a8a;
-        color: white;
-        border-color: #3b82f6;
-      }
-
       .metric-label {
         color: #9ca3af;
         font-size: 11px;
@@ -38,6 +26,11 @@
         font-family: monospace;
         font-size: 13px;
         font-weight: 700;
+      }
+
+      /* Класс для полного скрытия элементов */
+      .hidden-card {
+        display: none !important;
       }
 
       /* Анимация пульсации для зеленого индикатора "Онлайн" */
@@ -58,59 +51,120 @@
     </style>
   </head>
 
-  <body class="p-3 max-w-5xl mx-auto">
+  <body class="p-3 max-w-5xl mx-auto space-y-3">
     <div
-      class="mb-3 flex justify-between items-center bg-gray-950/50 border border-gray-800 rounded-lg p-2 px-3 shadow-sm"
+      class="flex justify-between items-center bg-gray-950/50 border border-gray-800 rounded-lg p-2 px-3 shadow-sm"
     >
-      <div class="text-xs text-gray-400">Binance / Gate premium index average</div>
+      <div class="text-xs text-gray-400">Funding Premium Index Monitor</div>
 
-      <div class="flex items-center gap-2">
-        <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-yellow-400"></span>
-        <span id="status-text" class="text-[11px] font-mono text-gray-400 uppercase tracking-wider"
-          >Подключение...</span
+      <div class="flex items-center gap-3">
+        <button
+          onclick="toggleSettingsPanel()"
+          class="text-gray-400 hover:text-white text-sm bg-gray-800/80 p-1 px-2 rounded border border-gray-700 flex items-center gap-1 cursor-pointer transition"
         >
+          <span>⚙️</span> <span class="text-xs hidden sm:inline">Биржи</span>
+        </button>
+
+        <div class="flex items-center gap-2 border-l border-gray-800 pl-3">
+          <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-yellow-400"></span>
+          <span
+            id="status-text"
+            class="text-[11px] font-mono text-gray-400 uppercase tracking-wider"
+            >Подключение...</span
+          >
+        </div>
       </div>
     </div>
 
-    <div class="flex gap-2 mb-3">
+    <div
+      id="settings-panel"
+      class="hidden-card bg-gray-950 border border-gray-800 rounded-lg p-3 shadow-2xl transition-all duration-300 animate-fadeIn"
+    >
+      <div
+        class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 flex justify-between items-center"
+      >
+        <span>Отображаемые биржи:</span>
+        <span class="text-[10px] text-gray-500 normal-case"
+          >кликом скрывайте/отображайте блоки</span
+        >
+      </div>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <label
+          class="flex items-center gap-2 bg-gray-900 border border-gray-800 p-2 rounded-lg cursor-pointer select-none hover:bg-gray-850"
+        >
+          <input
+            type="checkbox"
+            id="chk-binance"
+            checked
+            onclick="toggleExchange('binance')"
+            class="w-4 h-4 accent-yellow-400"
+          />
+          <span class="text-sm font-medium text-yellow-400">Binance</span>
+        </label>
+        <label
+          class="flex items-center gap-2 bg-gray-900 border border-gray-800 p-2 rounded-lg cursor-pointer select-none hover:bg-gray-850"
+        >
+          <input
+            type="checkbox"
+            id="chk-gate"
+            checked
+            onclick="toggleExchange('gate')"
+            class="w-4 h-4 accent-green-500"
+          />
+          <span class="text-sm font-medium text-green-400">Gate.io</span>
+        </label>
+        <label
+          class="flex items-center gap-2 bg-gray-900 border border-gray-800 p-2 rounded-lg cursor-pointer select-none hover:bg-gray-850"
+        >
+          <input
+            type="checkbox"
+            id="chk-bitget"
+            checked
+            onclick="toggleExchange('bitget')"
+            class="w-4 h-4 accent-cyan-400"
+          />
+          <span class="text-sm font-medium text-cyan-400">Bitget</span>
+        </label>
+        <label
+          class="flex items-center gap-2 bg-gray-900 border border-gray-800 p-2 rounded-lg cursor-pointer select-none hover:bg-gray-850"
+        >
+          <input
+            type="checkbox"
+            id="chk-bybit"
+            checked
+            onclick="toggleExchange('bybit')"
+            class="w-4 h-4 accent-orange-500"
+          />
+          <span class="text-sm font-medium text-orange-400">Bybit</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="flex gap-2">
       <input
         type="text"
         id="symbol-input"
         value="BTC"
         placeholder="BTC / ETH / PROVE"
-        class="bg-gray-800 text-white p-2 rounded text-center border border-gray-700 uppercase font-bold flex-1"
+        class="bg-gray-800 text-white p-2 rounded text-center border border-gray-700 uppercase font-bold flex-1 focus:outline-none focus:border-blue-500 transition"
       />
-
       <button
         onclick="loadAllData()"
-        class="bg-blue-600 hover:bg-blue-700 px-4 rounded font-bold text-white"
+        class="bg-blue-600 hover:bg-blue-700 px-5 rounded font-bold text-white transition cursor-pointer shadow-md"
       >
         OK
       </button>
     </div>
 
-    <div class="grid grid-cols-2 gap-2 mb-3">
-      <button
-        id="btn-binance"
-        onclick="toggleExchange('binance')"
-        class="exchange-btn active rounded-lg p-2 font-bold"
+    <div class="flex flex-wrap gap-3 w-full">
+      <div
+        id="card-binance"
+        class="bg-gray-950 border border-gray-800 rounded-lg p-3 shadow-xl min-w-[240px] flex-1"
       >
-        Binance
-      </button>
-
-      <button
-        id="btn-gate"
-        onclick="toggleExchange('gate')"
-        class="exchange-btn active rounded-lg p-2 font-bold"
-      >
-        Gate.io
-      </button>
-    </div>
-
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-      <div id="card-binance" class="bg-gray-950 border border-gray-800 rounded-lg p-3 shadow-xl">
         <div class="flex justify-between items-center mb-3">
-          <div class="font-bold text-white">Binance</div>
+          <div class="font-bold text-white flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-yellow-400"></span>Binance
+          </div>
           <div id="binance-status" class="text-xs font-mono text-yellow-400">loading...</div>
         </div>
 
@@ -119,32 +173,26 @@
             <div class="metric-label">Текущий фандинг</div>
             <div id="binance-current-funding" class="metric-value text-green-400">—</div>
           </div>
-
           <div>
             <div class="metric-label">Ожидаемый фандинг</div>
             <div id="binance-projected-funding" class="metric-value text-blue-400">—</div>
           </div>
-
           <div>
             <div class="metric-label">Среднее откл.</div>
             <div id="binance-current-avg" class="metric-value">—</div>
           </div>
-
           <div>
             <div class="metric-label">Ожидаемое ср. откл.</div>
             <div id="binance-projected-avg" class="metric-value">—</div>
           </div>
-
           <div>
             <div class="metric-label">Лимиты</div>
             <div id="binance-limits" class="metric-value text-gray-300">—</div>
           </div>
-
           <div>
             <div class="metric-label">Точки</div>
             <div id="binance-points" class="metric-value text-purple-400">—</div>
           </div>
-
           <div class="col-span-2 border-t border-gray-800 pt-2">
             <div class="metric-label">Нужно держать для лимита</div>
             <div id="binance-required" class="metric-value text-yellow-400 text-base">—</div>
@@ -152,9 +200,14 @@
         </div>
       </div>
 
-      <div id="card-gate" class="bg-gray-950 border border-gray-800 rounded-lg p-3 shadow-xl">
+      <div
+        id="card-gate"
+        class="bg-gray-950 border border-gray-800 rounded-lg p-3 shadow-xl min-w-[240px] flex-1"
+      >
         <div class="flex justify-between items-center mb-3">
-          <div class="font-bold text-white">Gate.io</div>
+          <div class="font-bold text-white flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-green-500"></span>Gate.io
+          </div>
           <div id="gate-status" class="text-xs font-mono text-green-400">loading...</div>
         </div>
 
@@ -163,35 +216,115 @@
             <div class="metric-label">Текущий фандинг</div>
             <div id="gate-current-funding" class="metric-value text-green-400">—</div>
           </div>
-
           <div>
             <div class="metric-label">Ожидаемый фандинг</div>
             <div id="gate-projected-funding" class="metric-value text-blue-400">—</div>
           </div>
-
           <div>
             <div class="metric-label">Среднее откл.</div>
             <div id="gate-current-avg" class="metric-value">—</div>
           </div>
-
           <div>
             <div class="metric-label">Ожидаемое ср. откл.</div>
             <div id="gate-projected-avg" class="metric-value">—</div>
           </div>
-
           <div>
             <div class="metric-label">Лимиты</div>
             <div id="gate-limits" class="metric-value text-gray-300">—</div>
           </div>
-
           <div>
             <div class="metric-label">Точки</div>
             <div id="gate-points" class="metric-value text-purple-400">—</div>
           </div>
-
           <div class="col-span-2 border-t border-gray-800 pt-2">
             <div class="metric-label">Нужно держать для лимита</div>
             <div id="gate-required" class="metric-value text-green-400 text-base">—</div>
+          </div>
+        </div>
+      </div>
+
+      <div
+        id="card-bitget"
+        class="bg-gray-950 border border-gray-800 rounded-lg p-3 shadow-xl min-w-[240px] flex-1"
+      >
+        <div class="flex justify-between items-center mb-3">
+          <div class="font-bold text-white flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-cyan-400"></span>Bitget
+          </div>
+          <div id="bitget-status" class="text-xs font-mono text-cyan-400">loading...</div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-x-3 gap-y-2">
+          <div>
+            <div class="metric-label">Текущий фандинг</div>
+            <div id="bitget-current-funding" class="metric-value text-green-400">—</div>
+          </div>
+          <div>
+            <div class="metric-label">Ожидаемый фандинг</div>
+            <div id="bitget-projected-funding" class="metric-value text-blue-400">—</div>
+          </div>
+          <div>
+            <div class="metric-label">Среднее откл.</div>
+            <div id="bitget-current-avg" class="metric-value">—</div>
+          </div>
+          <div>
+            <div class="metric-label">Ожидаемое ср. откл.</div>
+            <div id="bitget-projected-avg" class="metric-value">—</div>
+          </div>
+          <div>
+            <div class="metric-label">Лимиты</div>
+            <div id="bitget-limits" class="metric-value text-gray-300">—</div>
+          </div>
+          <div>
+            <div class="metric-label">Точки</div>
+            <div id="bitget-points" class="metric-value text-purple-400">—</div>
+          </div>
+          <div class="col-span-2 border-t border-gray-800 pt-2">
+            <div class="metric-label">Нужно держать для лимита</div>
+            <div id="bitget-required" class="metric-value text-cyan-400 text-base">—</div>
+          </div>
+        </div>
+      </div>
+
+      <div
+        id="card-bybit"
+        class="bg-gray-950 border border-gray-800 rounded-lg p-3 shadow-xl min-w-[240px] flex-1"
+      >
+        <div class="flex justify-between items-center mb-3">
+          <div class="font-bold text-white flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-orange-500"></span>Bybit
+          </div>
+          <div id="bybit-status" class="text-xs font-mono text-orange-400">loading...</div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-x-3 gap-y-2">
+          <div>
+            <div class="metric-label">Текущий фандинг</div>
+            <div id="bybit-current-funding" class="metric-value text-green-400">—</div>
+          </div>
+          <div>
+            <div class="metric-label">Ожидаемый фандинг</div>
+            <div id="bybit-projected-funding" class="metric-value text-blue-400">—</div>
+          </div>
+          <div>
+            <div class="metric-label">Среднее откл.</div>
+            <div id="bybit-current-avg" class="metric-value">—</div>
+          </div>
+          <div>
+            <div class="metric-label">Ожидаемое ср. откл.</div>
+            <div id="bybit-projected-avg" class="metric-value">—</div>
+          </div>
+          <div>
+            <div class="metric-label">Лимиты</div>
+            <div id="bybit-limits" class="metric-value text-gray-300">—</div>
+          </div>
+          <div>
+            <div class="metric-label">Точки</div>
+            <div id="bybit-points" class="metric-value text-purple-400">—</div>
+          </div>
+          <div class="col-span-2 border-t border-gray-800 pt-2">
+            <div class="metric-label">Нужно держать для лимита</div>
+            <div id="bybit-required" class="metric-value text-orange-400 text-base">—</div>
           </div>
         </div>
       </div>
@@ -199,7 +332,7 @@
 
     <div
       id="chart-container"
-      class="w-full h-72 bg-gray-950 rounded-lg overflow-hidden border border-gray-800 shadow-inner"
+      class="w-full h-80 bg-gray-950 rounded-lg overflow-hidden border border-gray-800 shadow-inner"
     ></div>
 
     <script>
@@ -211,6 +344,8 @@
       let enabledExchanges = {
         binance: true,
         gate: true,
+        bitget: true,
+        bybit: true,
       };
 
       let isLoading = false;
@@ -218,15 +353,17 @@
       let timerInterval = null;
 
       const exchangeConfig = {
-        binance: {
-          name: 'Binance',
-          color: '#facc15',
-        },
-        gate: {
-          name: 'Gate.io',
-          color: '#22c55e',
-        },
+        binance: { name: 'Binance', color: '#facc15' },
+        gate: { name: 'Gate.io', color: '#22c55e' },
+        bitget: { name: 'Bitget', color: '#00f0ff' },
+        bybit: { name: 'Bybit', color: '#f97316' },
       };
+
+      // Переключатель видимости панели настроек
+      function toggleSettingsPanel() {
+        const panel = document.getElementById('settings-panel');
+        if (panel) panel.classList.toggle('hidden-card');
+      }
 
       // Функция управления индикатором онлайна
       function updateGlobalStatus(state, text) {
@@ -236,8 +373,6 @@
         if (!dot || !txt) return;
 
         txt.innerText = text;
-
-        // Сбрасываем старые классы цвета и анимации
         dot.className = 'w-2.5 h-2.5 rounded-full transition-all duration-300 ';
 
         if (state === 'loading') {
@@ -249,7 +384,6 @@
         }
       }
 
-      // Запуск локального счетчика времени со времени последнего апдейта
       function startLiveTimer() {
         if (timerInterval) clearInterval(timerInterval);
 
@@ -257,7 +391,6 @@
           if (!lastUpdateTime) return;
           const diffSeconds = Math.round((Date.now() - lastUpdateTime) / 1000);
 
-          // Если данные не обновлялись больше 45 секунд (а таймер стоит на 30), значит что-то подвисло
           if (diffSeconds > 45) {
             updateGlobalStatus('error', `Зависло (${diffSeconds} сек)`);
           } else if (!isLoading) {
@@ -292,28 +425,21 @@
             background: { color: '#090d16' },
             textColor: '#d1d4dc',
           },
-
           grid: {
             vertLines: { color: '#161b26' },
             horzLines: { color: '#161b26' },
           },
-
           timeScale: {
             timeVisible: true,
             secondsVisible: false,
-
             rightOffset: 0,
             barSpacing: 6,
-
             fixLeftEdge: true,
             fixRightEdge: true,
-
             borderVisible: false,
           },
-
           rightPriceScale: {
             borderVisible: false,
-
             scaleMargins: {
               top: 0.08,
               bottom: 0.08,
@@ -323,14 +449,10 @@
 
         const zeroLineOptions = {
           color: 'rgba(255,255,255,0.55)',
-
           lineWidth: 2,
-
           lineStyle: LightweightCharts.LineStyle.Dashed,
-
           priceLineVisible: false,
           lastValueVisible: false,
-
           crosshairMarkerVisible: false,
         };
 
@@ -351,7 +473,6 @@
         const options = {
           color: cfg.color,
           lineWidth: 2,
-
           priceLineVisible: false,
           lastValueVisible: true,
         };
@@ -367,13 +488,9 @@
         if (!window.zeroPriceLineCreated) {
           series.createPriceLine({
             price: 0,
-
             color: 'rgba(255,255,255,0.65)',
-
             lineWidth: 2,
-
             lineStyle: LightweightCharts.LineStyle.Dashed,
-
             axisLabelVisible: true,
           });
 
@@ -383,16 +500,23 @@
         return series;
       }
 
+      // ЛОГИКА ОТОБРАЖЕНИЯ И АВТОМАТИЧЕСКОГО РАСПРЕДЕЛЕНИЯ МЕСТА НА ЭКРАНЕ
       function toggleExchange(exchange) {
-        enabledExchanges[exchange] = !enabledExchanges[exchange];
+        const checkbox = document.getElementById(`chk-${exchange}`);
+        if (checkbox) {
+          enabledExchanges[exchange] = checkbox.checked;
+        } else {
+          enabledExchanges[exchange] = !enabledExchanges[exchange];
+        }
 
-        document
-          .getElementById(`btn-${exchange}`)
-          .classList.toggle('active', enabledExchanges[exchange]);
-
-        document
-          .getElementById(`card-${exchange}`)
-          .classList.toggle('opacity-40', !enabledExchanges[exchange]);
+        const card = document.getElementById(`card-${exchange}`);
+        if (card) {
+          if (enabledExchanges[exchange]) {
+            card.classList.remove('hidden-card');
+          } else {
+            card.classList.add('hidden-card');
+          }
+        }
 
         if (!enabledExchanges[exchange] && seriesByExchange[exchange]) {
           seriesByExchange[exchange].setData([]);
@@ -406,7 +530,6 @@
         if (value === undefined || value === null || Number.isNaN(Number(value))) {
           return '—';
         }
-
         return Number(value).toFixed(6) + '%';
       }
 
@@ -451,7 +574,6 @@
           const err = await res.json();
           throw new Error(err.detail || `${exchange} error`);
         }
-
         return await res.json();
       }
 
@@ -459,9 +581,7 @@
         if (isLoading) return;
         isLoading = true;
 
-        // Включаем желтый индикатор — идет запрос
         updateGlobalStatus('loading', 'Обновление данных...');
-
         let hasError = false;
 
         try {
@@ -508,7 +628,6 @@
 
           chart.timeScale().fitContent();
 
-          // Если критических ошибок сети нет — фиксируем время успеха
           if (!hasError) {
             lastUpdateTime = Date.now();
             updateGlobalStatus('online', 'Онлайн | 0с назад');
@@ -529,9 +648,7 @@
         document.getElementById('symbol-input').value = savedSymbol;
       }
 
-      // Запускаем тикающий таймер секунд
       startLiveTimer();
-
       loadAllData();
       setInterval(loadAllData, 30000);
     </script>
