@@ -7,8 +7,9 @@ SETTLE = "usdt"
 GATE_INTEREST_PERCENT = 0.01
 GATE_CLAMP_PERCENT = 0.05
 
-# Практический запас для Gate.
-# Если лимит -2%, то цель premium average будет примерно -2.20%.
+# Практический запас.
+# 0 = строго по формуле.
+# 0.20 = если хочешь целиться глубже, например -2.20% вместо -2.00%.
 GATE_LIMIT_EXTRA_PERCENT = 0
 
 
@@ -64,37 +65,77 @@ def get_gate_funding_limits(contract_info, ticker_info):
     return floor_percent, cap_percent
 
 
-def calc_gate_funding_from_premium(avg_premium_percent, floor_percent, cap_percent):
+def calc_gate_funding_from_premium(
+    avg_premium_percent,
+    interval_hours,
+    floor_percent,
+    cap_percent,
+):
+    """
+    New Gate formula:
+
+    Funding Rate =
+    clamp(
+        [P + clamp(I - P, -0.05%, +0.05%)] / (8 / N),
+        lower,
+        upper
+    )
+
+    P = weighted premium index average
+    I = base rate, usually 0.01%
+    N = funding interval in hours
+    """
     interest_component = clamp(
         GATE_INTEREST_PERCENT - avg_premium_percent,
         -GATE_CLAMP_PERCENT,
         GATE_CLAMP_PERCENT,
     )
 
-    funding_percent = avg_premium_percent + interest_component
-    return clamp(funding_percent, floor_percent, cap_percent)
+    raw_funding = (
+        avg_premium_percent + interest_component
+    ) / (8 / interval_hours)
+
+    return clamp(raw_funding, floor_percent, cap_percent)
 
 
-def get_gate_target_premium_for_limit(target_funding_percent):
+def get_gate_target_premium_for_limit(
+    target_funding_percent,
+    interval_hours,
+):
     """
-    Gate formula:
-    funding = premium_avg + clamp(interest - premium_avg, -0.05%, +0.05%)
+    Reverse of new Gate formula.
 
-    Для отрицательного лимита обычно clamp = +0.05,
-    значит premium_avg = target_funding - 0.05.
+    target_funding = [P + clamp(I - P)] / (8 / N)
 
-    Для положительного лимита обычно clamp = -0.05,
-    значит premium_avg = target_funding + 0.05.
+    So:
+    target_inside = target_funding * (8 / N)
 
-    Плюс добавляем practical extra 0.20%.
+    For negative limit:
+    clamp is usually +0.05
+    P = target_inside - 0.05
+
+    For positive limit:
+    clamp is usually -0.05
+    P = target_inside + 0.05
     """
-    if target_funding_percent < 0:
-        return target_funding_percent - GATE_CLAMP_PERCENT - GATE_LIMIT_EXTRA_PERCENT
+    scale = 8 / interval_hours
+    target_inside = target_funding_percent * scale
 
-    if target_funding_percent > 0:
-        return target_funding_percent + GATE_CLAMP_PERCENT + GATE_LIMIT_EXTRA_PERCENT
+    if target_inside < GATE_INTEREST_PERCENT:
+        return (
+            target_inside
+            - GATE_CLAMP_PERCENT
+            - GATE_LIMIT_EXTRA_PERCENT
+        )
 
-    return 0.0
+    if target_inside > GATE_INTEREST_PERCENT:
+        return (
+            target_inside
+            + GATE_CLAMP_PERCENT
+            + GATE_LIMIT_EXTRA_PERCENT
+        )
+
+    return GATE_INTEREST_PERCENT
 
 
 def get_gate_live_data(contract: str):
@@ -110,6 +151,8 @@ def get_gate_live_data(contract: str):
     if funding_interval <= 0 or funding_next_apply <= 0:
         return {"error": "У контракта нет данных по funding cycle"}
 
+    interval_hours = funding_interval / 3600
+
     now_ts_raw = int(time.time())
     cycle_start_raw = funding_next_apply - funding_interval
 
@@ -122,7 +165,7 @@ def get_gate_live_data(contract: str):
     from_ts = cycle_start_raw - (cycle_start_raw % step_seconds)
     to_ts = now_ts_raw - (now_ts_raw % step_seconds)
 
-    expected_total_points = funding_interval // step_seconds
+    expected_total_points = int(funding_interval // step_seconds)
 
     items = gate_get_premium_index(contract, from_ts, to_ts, interval=interval)
     if not items:
@@ -131,53 +174,76 @@ def get_gate_live_data(contract: str):
     by_ts = {int(item["t"]): item for item in items}
     expected_timestamps = list(range(from_ts, to_ts, step_seconds))
 
-    values = []
+    values_percent = []
     chart_points = []
 
-    for ts in expected_timestamps:
+    weighted_sum = 0.0
+    weights_sum = 0.0
+
+    for i, ts in enumerate(expected_timestamps, start=1):
         item = by_ts.get(ts)
         if item is None or "c" not in item:
             continue
 
-        value = float(item["c"])
-        values.append(value)
-        chart_points.append({"time": ts, "value": value * 100})
+        value_percent = float(item["c"]) * 100
 
-    if not values:
+        values_percent.append(value_percent)
+        chart_points.append({"time": ts, "value": value_percent})
+
+        weighted_sum += i * value_percent
+        weights_sum += i
+
+    if not values_percent or weights_sum == 0:
         return {"error": "Нет ни одной точки в выбранном диапазоне"}
 
-    used_points = len(values)
-    last_value = values[-1]
+    used_points = len(values_percent)
+    last_value_percent = values_percent[-1]
 
-    current_avg_percent = (sum(values) / used_points) * 100
+    current_avg_percent = weighted_sum / weights_sum
 
-    if used_points >= expected_total_points:
+    if len(expected_timestamps) >= expected_total_points:
         projected_avg_percent = current_avg_percent
     else:
-        total_sum = sum(values) + (expected_total_points - used_points) * last_value
-        projected_avg_percent = (total_sum / expected_total_points) * 100
+        projected_weighted_sum = weighted_sum
+        projected_weights_sum = weights_sum
+
+        last_known_index = len(expected_timestamps)
+
+        for i in range(last_known_index + 1, expected_total_points + 1):
+            projected_weighted_sum += i * last_value_percent
+            projected_weights_sum += i
+
+        projected_avg_percent = projected_weighted_sum / projected_weights_sum
 
     projected_funding_percent = calc_gate_funding_from_premium(
         projected_avg_percent,
+        interval_hours,
         floor_percent,
         cap_percent,
     )
-
-    points_left = expected_total_points - used_points
 
     if projected_avg_percent < 0:
         target_funding_percent = floor_percent
     else:
         target_funding_percent = cap_percent
 
-    target_avg_percent = get_gate_target_premium_for_limit(target_funding_percent)
+    target_avg_percent = get_gate_target_premium_for_limit(
+        target_funding_percent,
+        interval_hours,
+    )
+
+    points_left = expected_total_points - len(expected_timestamps)
 
     if points_left > 0:
-        current_sum_percent = sum(values) * 100
+        remaining_weights_sum = sum(
+            i for i in range(len(expected_timestamps) + 1, expected_total_points + 1)
+        )
+
+        total_weights_sum = weights_sum + remaining_weights_sum
 
         required_deviation_percent = (
-            target_avg_percent * expected_total_points - current_sum_percent
-        ) / points_left
+            target_avg_percent * total_weights_sum - weighted_sum
+        ) / remaining_weights_sum
 
         req_dev_str = f"{required_deviation_percent:.6f}%"
     else:
@@ -187,7 +253,7 @@ def get_gate_live_data(contract: str):
 
     return {
         "symbol": contract,
-        "price_mode": f"INTERVAL {interval}",
+        "price_mode": f"INTERVAL {interval} | WEIGHTED",
         "current_avg": round(current_avg_percent, 6),
         "projected_avg": round(projected_avg_percent, 6),
         "current_funding": round(current_funding, 6),
