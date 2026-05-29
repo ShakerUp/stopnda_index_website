@@ -17,6 +17,7 @@ from binance_index import get_binance_live_data
 from gate_index import get_gate_live_data
 from bitget_index import get_bitget_live_data
 from bybit_index import get_bybit_live_data
+from okx_index import get_okx_live_data
 
 load_dotenv()
 
@@ -42,12 +43,16 @@ def normalize_symbol(symbol: str, exchange: str) -> str:
     s = s.replace("/", "").replace("-", "").replace(" ", "")
     s = s.replace("_PERP", "").replace("PERP", "")
     s = s.replace("_USDT", "").replace("USDT", "")
+    s = s.replace("_SWAP", "").replace("SWAP", "")
 
     if not s:
         raise ValueError("Пустой тикер")
 
     if exchange == "gate":
         return f"{s}_USDT"
+
+    if exchange == "okx":
+        return s
 
     return f"{s}USDT"
 
@@ -56,12 +61,24 @@ async def fetch_exchange_data(symbol: str, exchange: str):
     async with external_semaphore:
         if exchange == "gate":
             return await asyncio.to_thread(get_gate_live_data, symbol)
+
         elif exchange == "bitget":
             return await get_bitget_live_data(symbol)
-        elif exchange == "bybit":
-            return await get_bybit_live_data(symbol)  # Прямой вызов асинхронной функции
 
-        return await asyncio.to_thread(get_binance_live_data, symbol, "close")
+        elif exchange == "bybit":
+            return await get_bybit_live_data(symbol)
+
+        elif exchange == "okx":
+            return await get_okx_live_data(symbol)
+
+        elif exchange == "binance":
+            return await asyncio.to_thread(
+                get_binance_live_data,
+                symbol,
+                "close",
+            )
+
+        raise ValueError(f"Unknown exchange: {exchange}")
 
 
 async def get_cached_metrics(symbol: str, exchange: str):
@@ -133,7 +150,7 @@ async def api_metrics(symbol: str, exchange: str = "binance"):
     try:
         exchange = exchange.lower().strip()
 
-        if exchange not in {"binance", "gate", "bitget", "bybit"}:
+        if exchange not in {"binance", "gate", "bitget", "bybit", "okx"}:
             raise HTTPException(status_code=400, detail="Unknown exchange")
 
         symbol_clean = normalize_symbol(symbol, exchange)
