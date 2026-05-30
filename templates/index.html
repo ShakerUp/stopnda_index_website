@@ -28,12 +28,10 @@
         font-weight: 700;
       }
 
-      /* Класс для полного скрытия элементов */
       .hidden-card {
         display: none !important;
       }
 
-      /* Анимация пульсации для зеленого индикатора "Онлайн" */
       @keyframes pulse {
         0%,
         100% {
@@ -48,10 +46,49 @@
       .animate-pulse-fast {
         animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
       }
+
+      /* Сворачиваемая ошибка */
+      .error-short {
+        font-family: monospace;
+        font-size: 11px;
+        color: #f87171;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        user-select: none;
+      }
+      .error-short:hover {
+        color: #fca5a5;
+      }
+      .error-full {
+        font-family: monospace;
+        font-size: 11px;
+        color: #f87171;
+        margin-top: 4px;
+        word-break: break-word;
+        white-space: pre-wrap;
+        display: none;
+        background: rgba(239, 68, 68, 0.08);
+        border-radius: 4px;
+        padding: 6px 8px;
+      }
+      .error-full.open {
+        display: block;
+      }
+      .error-toggle-icon {
+        font-size: 9px;
+        transition: transform 0.2s;
+        flex-shrink: 0;
+      }
+      .error-toggle-icon.open {
+        transform: rotate(90deg);
+      }
     </style>
   </head>
 
-  <body class="p-3 max-w-5xl mx-auto space-y-3">
+  <!-- max-w-screen-2xl убирает ограничение в 1024px, px-3 — минимальные боковые отступы -->
+  <body class="p-3 px-25 max-w-screen-2xl mx-auto space-y-3">
     <div
       class="flex justify-between items-center bg-gray-950/50 border border-gray-800 rounded-lg p-2 px-3 shadow-sm"
     >
@@ -168,18 +205,15 @@
       </button>
     </div>
 
-    <div class="flex flex-wrap gap-3 w-full">
-      <div
-        id="card-binance"
-        class="bg-gray-950 border border-gray-800 rounded-lg p-3 shadow-xl min-w-[240px] flex-1"
-      >
+    <!-- grid с auto-fit: на широких экранах все 5 карточек в ряд, на узких — перенос -->
+    <div class="grid gap-3" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr))">
+      <div id="card-binance" class="bg-gray-950 border border-gray-800 rounded-lg p-3 shadow-xl">
         <div class="flex justify-between items-center mb-3">
           <div class="font-bold text-white flex items-center gap-1.5">
             <span class="w-2 h-2 rounded-full bg-yellow-400"></span>Binance
           </div>
           <div id="binance-status" class="text-xs font-mono text-yellow-400">loading...</div>
         </div>
-
         <div class="grid grid-cols-2 gap-x-3 gap-y-2">
           <div>
             <div class="metric-label">Текущий фандинг</div>
@@ -210,19 +244,16 @@
             <div id="binance-required" class="metric-value text-yellow-400 text-base">—</div>
           </div>
         </div>
+        <div id="binance-error-box" class="mt-2 hidden"></div>
       </div>
 
-      <div
-        id="card-gate"
-        class="bg-gray-950 border border-gray-800 rounded-lg p-3 shadow-xl min-w-[240px] flex-1"
-      >
+      <div id="card-gate" class="bg-gray-950 border border-gray-800 rounded-lg p-3 shadow-xl">
         <div class="flex justify-between items-center mb-3">
           <div class="font-bold text-white flex items-center gap-1.5">
             <span class="w-2 h-2 rounded-full bg-green-500"></span>Gate.io
           </div>
           <div id="gate-status" class="text-xs font-mono text-green-400">loading...</div>
         </div>
-
         <div class="grid grid-cols-2 gap-x-3 gap-y-2">
           <div>
             <div class="metric-label">Текущий фандинг</div>
@@ -253,19 +284,16 @@
             <div id="gate-required" class="metric-value text-green-400 text-base">—</div>
           </div>
         </div>
+        <div id="gate-error-box" class="mt-2 hidden"></div>
       </div>
 
-      <div
-        id="card-bitget"
-        class="bg-gray-950 border border-gray-800 rounded-lg p-3 shadow-xl min-w-[240px] flex-1"
-      >
+      <div id="card-bitget" class="bg-gray-950 border border-gray-800 rounded-lg p-3 shadow-xl">
         <div class="flex justify-between items-center mb-3">
           <div class="font-bold text-white flex items-center gap-1.5">
             <span class="w-2 h-2 rounded-full bg-cyan-400"></span>Bitget
           </div>
           <div id="bitget-status" class="text-xs font-mono text-cyan-400">loading...</div>
         </div>
-
         <div class="grid grid-cols-2 gap-x-3 gap-y-2">
           <div>
             <div class="metric-label">Текущий фандинг</div>
@@ -296,19 +324,16 @@
             <div id="bitget-required" class="metric-value text-cyan-400 text-base">—</div>
           </div>
         </div>
+        <div id="bitget-error-box" class="mt-2 hidden"></div>
       </div>
 
-      <div
-        id="card-bybit"
-        class="bg-gray-950 border border-gray-800 rounded-lg p-3 shadow-xl min-w-[240px] flex-1"
-      >
+      <div id="card-bybit" class="bg-gray-950 border border-gray-800 rounded-lg p-3 shadow-xl">
         <div class="flex justify-between items-center mb-3">
           <div class="font-bold text-white flex items-center gap-1.5">
             <span class="w-2 h-2 rounded-full bg-orange-500"></span>Bybit
           </div>
           <div id="bybit-status" class="text-xs font-mono text-orange-400">loading...</div>
         </div>
-
         <div class="grid grid-cols-2 gap-x-3 gap-y-2">
           <div>
             <div class="metric-label">Текущий фандинг</div>
@@ -339,19 +364,16 @@
             <div id="bybit-required" class="metric-value text-orange-400 text-base">—</div>
           </div>
         </div>
+        <div id="bybit-error-box" class="mt-2 hidden"></div>
       </div>
 
-      <div
-        id="card-okx"
-        class="bg-gray-950 border border-gray-800 rounded-lg p-3 shadow-xl min-w-[240px] flex-1"
-      >
+      <div id="card-okx" class="bg-gray-950 border border-gray-800 rounded-lg p-3 shadow-xl">
         <div class="flex justify-between items-center mb-3">
           <div class="font-bold text-white flex items-center gap-1.5">
             <span class="w-2 h-2 rounded-full bg-pink-500"></span>OKX
           </div>
           <div id="okx-status" class="text-xs font-mono text-pink-400">loading...</div>
         </div>
-
         <div class="grid grid-cols-2 gap-x-3 gap-y-2">
           <div>
             <div class="metric-label">Текущий фандинг</div>
@@ -382,6 +404,7 @@
             <div id="okx-required" class="metric-value text-pink-400 text-base">—</div>
           </div>
         </div>
+        <div id="okx-error-box" class="mt-2 hidden"></div>
       </div>
     </div>
 
@@ -416,22 +439,17 @@
         okx: { name: 'OKX', color: '#ec4899' },
       };
 
-      // Переключатель видимости панели настроек
       function toggleSettingsPanel() {
         const panel = document.getElementById('settings-panel');
         if (panel) panel.classList.toggle('hidden-card');
       }
 
-      // Функция управления индикатором онлайна
       function updateGlobalStatus(state, text) {
         const dot = document.getElementById('status-dot');
         const txt = document.getElementById('status-text');
-
         if (!dot || !txt) return;
-
         txt.innerText = text;
         dot.className = 'w-2.5 h-2.5 rounded-full transition-all duration-300 ';
-
         if (state === 'loading') {
           dot.classList.add('bg-yellow-400', 'shadow-[0_0_8px_#facc15]');
         } else if (state === 'online') {
@@ -443,11 +461,9 @@
 
       function startLiveTimer() {
         if (timerInterval) clearInterval(timerInterval);
-
         timerInterval = setInterval(() => {
           if (!lastUpdateTime) return;
           const diffSeconds = Math.round((Date.now() - lastUpdateTime) / 1000);
-
           if (diffSeconds > 45) {
             updateGlobalStatus('error', `Зависло (${diffSeconds} сек)`);
           } else if (!isLoading) {
@@ -466,26 +482,15 @@
           .replace('USDT', '')
           .replace('_PERP', '')
           .replace('PERP', '');
-
-        if (symbol) {
-          localStorage.setItem('selected_crypto_symbol', symbol);
-        }
-
+        if (symbol) localStorage.setItem('selected_crypto_symbol', symbol);
         return symbol;
       }
 
       function initChart() {
         const container = document.getElementById('chart-container');
-
         chart = LightweightCharts.createChart(container, {
-          layout: {
-            background: { color: '#090d16' },
-            textColor: '#d1d4dc',
-          },
-          grid: {
-            vertLines: { color: '#161b26' },
-            horzLines: { color: '#161b26' },
-          },
+          layout: { background: { color: '#090d16' }, textColor: '#d1d4dc' },
+          grid: { vertLines: { color: '#161b26' }, horzLines: { color: '#161b26' } },
           timeScale: {
             timeVisible: true,
             secondsVisible: false,
@@ -497,10 +502,7 @@
           },
           rightPriceScale: {
             borderVisible: false,
-            scaleMargins: {
-              top: 0.08,
-              bottom: 0.08,
-            },
+            scaleMargins: { top: 0.08, bottom: 0.08 },
           },
         });
 
@@ -526,22 +528,18 @@
 
       function createSeries(exchange) {
         const cfg = exchangeConfig[exchange];
-
         const options = {
           color: cfg.color,
           lineWidth: 2,
           priceLineVisible: false,
           lastValueVisible: true,
         };
-
         let series;
-
         if (chart.addSeries && LightweightCharts.LineSeries) {
           series = chart.addSeries(LightweightCharts.LineSeries, options);
         } else {
           series = chart.addLineSeries(options);
         }
-
         if (!window.zeroPriceLineCreated) {
           series.createPriceLine({
             price: 0,
@@ -550,14 +548,11 @@
             lineStyle: LightweightCharts.LineStyle.Dashed,
             axisLabelVisible: true,
           });
-
           window.zeroPriceLineCreated = true;
         }
-
         return series;
       }
 
-      // ЛОГИКА ОТОБРАЖЕНИЯ И АВТОМАТИЧЕСКОГО РАСПРЕДЕЛЕНИЯ МЕСТА НА ЭКРАНЕ
       function toggleExchange(exchange) {
         const checkbox = document.getElementById(`chk-${exchange}`);
         if (checkbox) {
@@ -565,7 +560,6 @@
         } else {
           enabledExchanges[exchange] = !enabledExchanges[exchange];
         }
-
         const card = document.getElementById(`card-${exchange}`);
         if (card) {
           if (enabledExchanges[exchange]) {
@@ -574,19 +568,15 @@
             card.classList.add('hidden-card');
           }
         }
-
         if (!enabledExchanges[exchange] && seriesByExchange[exchange]) {
           seriesByExchange[exchange].setData([]);
           setStatus(exchange, 'off');
         }
-
         loadAllData();
       }
 
       function formatValue(value) {
-        if (value === undefined || value === null || Number.isNaN(Number(value))) {
-          return '—';
-        }
+        if (value === undefined || value === null || Number.isNaN(Number(value))) return '—';
         return Number(value).toFixed(6) + '%';
       }
 
@@ -595,30 +585,59 @@
         if (el) el.innerText = text;
       }
 
+      /* Отображение сворачиваемой ошибки */
+      function showError(exchange, message) {
+        const box = document.getElementById(`${exchange}-error-box`);
+        if (!box) return;
+
+        const MAX_SHORT = 60;
+        const shortText = message.length > MAX_SHORT ? message.slice(0, MAX_SHORT) + '…' : message;
+        const hasMore = message.length > MAX_SHORT;
+
+        box.classList.remove('hidden');
+        box.innerHTML = `
+          <div class="error-short" onclick="toggleErrorFull(this)" title="Нажмите для раскрытия">
+            <span class="error-toggle-icon">▶</span>
+            <span>${shortText}</span>
+          </div>
+          ${hasMore ? `<div class="error-full">${message}</div>` : ''}
+        `;
+      }
+
+      function toggleErrorFull(shortEl) {
+        const icon = shortEl.querySelector('.error-toggle-icon');
+        const full = shortEl.nextElementSibling;
+        if (!full || !full.classList.contains('error-full')) return;
+        full.classList.toggle('open');
+        icon.classList.toggle('open');
+      }
+
+      function clearError(exchange) {
+        const box = document.getElementById(`${exchange}-error-box`);
+        if (box) {
+          box.classList.add('hidden');
+          box.innerHTML = '';
+        }
+      }
+
       function updateCard(exchange, data) {
+        clearError(exchange);
         document.getElementById(`${exchange}-status`).innerText =
           `${data.symbol} | ${data.price_mode}`;
-
         document.getElementById(`${exchange}-current-funding`).innerText = formatValue(
           data.current_funding,
         );
-
         document.getElementById(`${exchange}-projected-funding`).innerText = formatValue(
           data.projected_funding,
         );
-
         document.getElementById(`${exchange}-current-avg`).innerText = formatValue(
           data.current_avg,
         );
-
         document.getElementById(`${exchange}-projected-avg`).innerText = formatValue(
           data.projected_avg,
         );
-
         document.getElementById(`${exchange}-limits`).innerText = data.limits || '—';
-
         document.getElementById(`${exchange}-points`).innerText = data.points_total || '—';
-
         document.getElementById(`${exchange}-required`).innerText = data.required_deviation || '—';
       }
 
@@ -626,7 +645,6 @@
         const res = await fetch(
           `/api/metrics?symbol=${encodeURIComponent(symbol)}&exchange=${exchange}`,
         );
-
         if (!res.ok) {
           const err = await res.json();
           throw new Error(err.detail || `${exchange} error`);
@@ -637,7 +655,6 @@
       async function loadAllData() {
         if (isLoading) return;
         isLoading = true;
-
         updateGlobalStatus('loading', 'Обновление данных...');
         let hasError = false;
 
@@ -653,7 +670,6 @@
 
             try {
               setStatus(exchange, 'loading...');
-
               const data = await loadExchangeData(exchange, symbol);
               updateCard(exchange, data);
 
@@ -662,10 +678,7 @@
               }
 
               const points = (data.chart_data || [])
-                .map((p) => ({
-                  time: Number(p.time),
-                  value: Number(p.value),
-                }))
+                .map((p) => ({ time: Number(p.time), value: Number(p.value) }))
                 .filter((p) => Number.isFinite(p.time) && Number.isFinite(p.value))
                 .sort((a, b) => a.time - b.time);
 
@@ -673,10 +686,7 @@
             } catch (e) {
               hasError = true;
               setStatus(exchange, 'error');
-
-              const requiredEl = document.getElementById(`${exchange}-required`);
-              if (requiredEl) requiredEl.innerText = e.message;
-
+              showError(exchange, e.message);
               if (seriesByExchange[exchange]) {
                 seriesByExchange[exchange].setData([]);
               }
