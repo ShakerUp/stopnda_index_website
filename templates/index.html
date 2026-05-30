@@ -88,7 +88,7 @@
   </head>
 
   <!-- max-w-screen-2xl убирает ограничение в 1024px, px-3 — минимальные боковые отступы -->
-  <body class="p-3 px-25 max-w-screen-2xl mx-auto space-y-3">
+  <body class="p-3 px-3 max-w-screen-2xl mx-auto space-y-3">
     <div
       class="flex justify-between items-center bg-gray-950/50 border border-gray-800 rounded-lg p-2 px-3 shadow-sm"
     >
@@ -622,8 +622,7 @@
 
       function updateCard(exchange, data) {
         clearError(exchange);
-        document.getElementById(`${exchange}-status`).innerText =
-          `${data.symbol} | ${data.price_mode}`;
+        document.getElementById(`${exchange}-status`).innerText = data.symbol || '—';
         document.getElementById(`${exchange}-current-funding`).innerText = formatValue(
           data.current_funding,
         );
