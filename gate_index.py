@@ -30,7 +30,8 @@ def gate_get_ticker_info(contract):
 
 
 def gate_get_premium_index(contract, from_ts, to_ts, interval):
-    url = f"{GATE_BASE}/{SETTLE}/premium_index"
+    # ИСПРАВЛЕНО: используем официальный домен api.gateio.ws и v4 эндпоинт
+    url = f"https://api.gateio.ws/api/v4/futures/{SETTLE}/premium_index"
     params = {
         "contract": contract.upper(),
         "from": from_ts,
@@ -38,10 +39,12 @@ def gate_get_premium_index(contract, from_ts, to_ts, interval):
         "interval": interval,
         "limit": 600,
     }
-    response = requests.get(url, params=params, timeout=20)
+    response = requests.get(url, params=params, headers={"Accept": "application/json"}, timeout=20)
     response.raise_for_status()
+    
+    # API v4 возвращает сразу чистый список (list), а не словарь с ключом "data"
     payload = response.json()
-    items = payload["data"] if isinstance(payload, dict) and "data" in payload else payload
+    items = payload if isinstance(payload, list) else []
 
     unique = {int(item["t"]): item for item in items if "t" in item}
     return [unique[t] for t in sorted(unique.keys())]
