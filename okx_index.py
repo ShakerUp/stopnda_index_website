@@ -5,8 +5,9 @@ import httpx
 OKX_BASE = "https://www.okx.com"
 
 STEP_SECONDS = 60
+
+OKX_INTEREST_PERCENT = 0.01
 CLAMP_PERCENT = 0.05
-DAILY_INTEREST_PERCENT = 0.03
 
 
 def clamp(value, min_value, max_value):
@@ -70,13 +71,13 @@ async def get_okx_premium_history(
     cursor_ms = to_ts * 1000
     from_ms = from_ts * 1000
 
-    for _ in range(20):
+    for _ in range(30):
         data = await okx_get(
             client,
             "/api/v5/public/premium-history",
             {
                 "instId": inst_id,
-                "after": cursor_ms,  # after = старше cursor_ms (движение назад)
+                "after": cursor_ms,
                 "limit": 100,
             },
         )
@@ -117,7 +118,6 @@ async def get_okx_premium_history(
 
             premium_percent = float(premium_raw) * 100
 
-            # Не перезаписываем — оставляем первое (самое свежее при обратном обходе)
             if minute_ts not in by_minute:
                 by_minute[minute_ts] = premium_percent
         except Exception:
@@ -148,7 +148,7 @@ async def get_okx_history_candles(
             {
                 "instId": inst_id,
                 "bar": "1m",
-                "after": cursor_ms,  # after = старше cursor_ms (движение назад)
+                "after": cursor_ms,
                 "limit": 100,
             },
         )
@@ -237,15 +237,15 @@ def calc_okx_funding_from_premium(
     floor_percent: float,
     cap_percent: float,
 ):
-    interest_percent = DAILY_INTEREST_PERCENT / (24 / interval_hours)
-
     interest_component = clamp(
-        interest_percent - avg_premium_percent,
+        OKX_INTEREST_PERCENT - avg_premium_percent,
         -CLAMP_PERCENT,
         CLAMP_PERCENT,
     )
 
-    raw_funding = avg_premium_percent + interest_component
+    raw_funding = (
+        avg_premium_percent + interest_component
+    ) / (8 / interval_hours)
 
     return clamp(raw_funding, floor_percent, cap_percent)
 
@@ -254,15 +254,16 @@ def get_okx_target_premium_for_limit(
     target_funding_percent: float,
     interval_hours: float,
 ):
-    interest_percent = DAILY_INTEREST_PERCENT / (24 / interval_hours)
+    scale = 8 / interval_hours
+    target_inside = target_funding_percent * scale
 
-    if target_funding_percent < interest_percent:
-        return target_funding_percent - CLAMP_PERCENT
+    if target_inside < OKX_INTEREST_PERCENT:
+        return target_inside - CLAMP_PERCENT
 
-    if target_funding_percent > interest_percent:
-        return target_funding_percent + CLAMP_PERCENT
+    if target_inside > OKX_INTEREST_PERCENT:
+        return target_inside + CLAMP_PERCENT
 
-    return interest_percent
+    return OKX_INTEREST_PERCENT
 
 
 async def get_okx_live_data(symbol: str):
