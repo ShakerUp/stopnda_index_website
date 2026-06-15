@@ -15,7 +15,10 @@ def gate_request(url, params=None):
         headers={"Accept": "application/json"},
         timeout=20,
     )
-    response.raise_for_status()
+
+    if response.status_code >= 400:
+        raise Exception(f"{response.status_code} {response.text} | url={response.url}")
+
     return response.json()
 
 
@@ -30,69 +33,22 @@ def gate_get_ticker_info(contract):
     return res[0] if isinstance(res, list) and len(res) > 0 else {}
 
 
-def gate_get_mark_price_candles(contract, from_ts, to_ts, interval="1m"):
-    url = f"https://api.gateio.ws/api/v4/futures/{SETTLE}/mark_price_candlesticks"
-    return gate_request(
+def gate_get_premium_index(contract, from_ts, to_ts, interval="1m"):
+    url = f"https://api.gateio.ws/api/v4/futures/{SETTLE}/premium_index"
+    payload = gate_request(
         url,
         {
             "contract": contract.upper(),
             "from": from_ts,
             "to": to_ts,
             "interval": interval,
-            "limit": 1000,
         },
     )
 
+    items = payload if isinstance(payload, list) else []
+    unique = {int(item["t"]): item for item in items if "t" in item and "c" in item}
 
-def gate_get_index_price_candles(contract, from_ts, to_ts, interval="1m"):
-    url = f"https://api.gateio.ws/api/v4/futures/{SETTLE}/index_price_candlesticks"
-    return gate_request(
-        url,
-        {
-            "contract": contract.upper(),
-            "from": from_ts,
-            "to": to_ts,
-            "interval": interval,
-            "limit": 1000,
-        },
-    )
-
-
-def gate_get_premium_from_mark_index(contract, from_ts, to_ts, interval="1m"):
-    mark_items = gate_get_mark_price_candles(contract, from_ts, to_ts, interval)
-    index_items = gate_get_index_price_candles(contract, from_ts, to_ts, interval)
-
-    mark_by_ts = {
-        int(item["t"]): item
-        for item in mark_items
-        if "t" in item and "c" in item
-    }
-
-    index_by_ts = {
-        int(item["t"]): item
-        for item in index_items
-        if "t" in item and "c" in item
-    }
-
-    result = []
-
-    for ts in sorted(set(mark_by_ts.keys()) & set(index_by_ts.keys())):
-        mark_price = float(mark_by_ts[ts]["c"])
-        index_price = float(index_by_ts[ts]["c"])
-
-        if index_price <= 0:
-            continue
-
-        premium_percent = (mark_price - index_price) / index_price * 100
-
-        result.append({
-            "t": ts,
-            "c": premium_percent,
-            "mark": mark_price,
-            "index": index_price,
-        })
-
-    return result
+    return [unique[t] for t in sorted(unique.keys())]
 
 
 def clamp(value, min_value, max_value):
@@ -109,9 +65,7 @@ def get_gate_funding_limits(contract_info, ticker_info):
     )
 
     cap_percent = abs(float(cap)) * 100
-    floor_percent = -cap_percent
-
-    return floor_percent, cap_percent
+    return -cap_percent, cap_percent
 
 
 def calc_weighted_avg(values):
@@ -169,15 +123,15 @@ def get_gate_live_data(contract: str):
     now_ts_raw = int(time.time())
     cycle_start_raw = funding_next_apply - funding_interval
 
-    interval = "1m"
     step_seconds = 60
+    interval = "1m"
 
     from_ts = cycle_start_raw - (cycle_start_raw % step_seconds)
     to_ts = now_ts_raw - (now_ts_raw % step_seconds)
 
     expected_total_points = int(funding_interval // step_seconds)
 
-    items = gate_get_premium_from_mark_index(
+    items = gate_get_premium_index(
         contract=contract,
         from_ts=from_ts,
         to_ts=to_ts,
@@ -185,7 +139,7 @@ def get_gate_live_data(contract: str):
     )
 
     if not items:
-        return {"error": "Gate не вернул mark/index данные за этот период"}
+        return {"error": "Gate не вернул premium_index за этот период"}
 
     by_ts = {int(item["t"]): item for item in items}
     expected_timestamps = list(range(from_ts, to_ts, step_seconds))
@@ -196,17 +150,15 @@ def get_gate_live_data(contract: str):
     for ts in expected_timestamps:
         item = by_ts.get(ts)
 
-        if item is None:
+        if item is None or "c" not in item:
             continue
 
-        value_percent = float(item["c"])
+        value_percent = float(item["c"]) * 100
 
         values_percent.append(value_percent)
         chart_points.append({
             "time": ts,
             "value": value_percent,
-            "mark": item.get("mark"),
-            "index": item.get("index"),
         })
 
     if not values_percent:
@@ -245,11 +197,7 @@ def get_gate_live_data(contract: str):
         )
 
         current_weights_sum = sum(range(1, used_points + 1))
-
-        remaining_start = used_points + 1
-        remaining_end = expected_total_points + 1
-
-        remaining_weights_sum = sum(range(remaining_start, remaining_end))
+        remaining_weights_sum = sum(range(used_points + 1, expected_total_points + 1))
         total_weights_sum = current_weights_sum + remaining_weights_sum
 
         required_deviation_percent = (
@@ -265,7 +213,7 @@ def get_gate_live_data(contract: str):
 
     return {
         "symbol": contract,
-        "price_mode": f"MARK/INDEX | INTERVAL {interval} | WEIGHTED ({interval_hours:.0f}h)",
+        "price_mode": f"PREMIUM_INDEX | INTERVAL {interval} | WEIGHTED ({interval_hours:.0f}h)",
         "current_avg": round(current_avg_percent, 6),
         "projected_avg": round(projected_avg_percent, 6),
         "current_funding": round(current_funding, 6),
